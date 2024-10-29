@@ -1,0 +1,172 @@
+    #pragma once
+    
+    #include "../clientlib/decompiler_imports.dl"
+    #include "../clientlib/loops_semantics.dl"
+    #include "../clientlib/guards.dl"
+    #include "../clientlib/vulnerability_macros.dl"
+    #include "../clientlib/memory_modeling/memory_modeling.dl"
+    #include "../clientlib/storage_modeling/storage_modeling.dl"
+
+    .decl MyVariable_Value(var: Variable, value: Function)
+    .input MyVariable_Value(IO="file", filename="TAC_Variable_Value.csv", delimiter="\t")
+
+    .decl Variable_block(var: Variable, value: Block)
+    .input Variable_block(IO="file", filename="TAC_Variable_Value.csv", delimiter="\t")
+
+
+
+
+
+
+
+
+
+
+
+
+
+    .decl EQVars(a: Variable, b: Variable, res: Variable)
+    EQVars(a, b, res) :-
+        EQ(_, a, b, res) ; EQ(_, b, a, res); XOR(_, a, b, res) ; XOR(_, b, a, res); SUB(_, a, b, res) ; SUB(_, b, a, res).
+
+    .decl SenderGuard(globalVal: Value, predicate: Variable)
+    .output SenderGuard
+    SenderGuard(cat("CONSTANT_", val), predicate) :-
+        (CALLER(_, msgsenderFrom) ; ORIGIN(_, msgsenderFrom)),
+        DataFlows(msgsenderFrom, msgsender),
+        EQVars(const, msgsender, predicateFrom),
+        Variable_Value(const, val),
+        DataFlows(predicateFrom, predicate).
+
+
+    SenderGuard(globalVal, predicate) :-
+        (CALLER(_, msgsenderFrom) ; ORIGIN(_, msgsenderFrom)),
+        DataFlows(msgsenderFrom, msgsender),
+        EQVars(global, msgsender, predicateFrom),
+        LoadGlobalVariable(_, globalVal, globalFrom),
+        DataFlows(globalFrom, global),
+        DataFlows(predicateFrom, predicate).
+
+
+
+
+    SenderGuard(dataId, predicate) :-
+        (CALLER(_, msgsenderFrom) ; ORIGIN(_, msgsenderFrom)),
+        DataFlows(msgsenderFrom, msgsender),
+        LoadFromDataStructure(_, dataId, msgsender, inop_result),
+        DataFlows(inop_result, predicate).
+
+    SenderGuard(dataId, predicate) :-
+        (CALLER(_, msgsenderFrom) ; ORIGIN(_, msgsenderFrom)),
+        DataFlows(msgsenderFrom, msgsender),
+        EQVars(constDataStrLoad, msgsender, predicateFrom),
+        LoadFromDataStructure(_, dataId, constVar, constDataStrLoadFrom),
+        Variable_Value(constVar, _),
+        DataFlows(constDataStrLoadFrom, constDataStrLoad),
+        DataFlows(predicateFrom, predicate).
+
+
+    SenderGuard(globalVal, predicate) :-
+        (CALLER(_, msgsenderFrom) ; ORIGIN(_, msgsenderFrom)),
+        DataFlows(msgsenderFrom, msgsender),
+        EQVars(callReturn, msgsender, predicateFrom),
+        LoadGlobalVariable(_, globalVal, globalFrom),
+        DataFlows(globalFrom, global),
+        Statement_Uses(call, global, 1),
+        ExternalCall_NumOfArgs(call, 0),
+        ExternalCall_ActualReturn(call, callReturnFrom, _),
+        DataFlows(callReturnFrom, callReturn),
+        DataFlows(predicateFrom, predicate).
+
+    SenderGuard(globalVal, predicate) :-
+        (CALLER(_, msgsenderFrom) ; ORIGIN(_, msgsenderFrom)),
+        DataFlows(msgsenderFrom, msgsender),
+        StatementUsesMemory_ActualMemoryArg(call, _, 1, msgsender),
+        ExternalCall_NumOfArgs(call, 1),
+        Statement_Uses(call, global, 1),
+        DataFlows(globalFrom, global),
+        LoadGlobalVariable(_, globalVal, globalFrom),
+        ExternalCall_ActualReturn(call, callReturnFrom, _),
+        DataFlows(callReturnFrom, predicate).
+
+
+
+            
+    SenderGuard("this", predicate) :-
+        CALLER(_, msgsenderFrom),
+        DataFlows(msgsenderFrom, msgsender),
+        EQVars(this, msgsender, predicateFrom),
+        DataFlows(thisFrom, this),
+        ADDRESS(_, thisFrom),
+        DataFlows(predicateFrom, predicate).
+
+
+
+    .decl UniswapV2GetReserve(data_flow: Variable)
+    UniswapV2GetReserve(data_flow) :-
+        CallToSignature(call, "getReserves()"),
+        ExternalCall_NumOfArgs(call, 0),
+        ExternalCall_ActualReturn(_, reserve0_flow, 0),  
+        ExternalCall_ActualReturn(_, reserve1_flow, 1),  
+        ExternalCall_ActualReturn(_, _, 2),
+        (DataFlows(reserve0_flow, data_flow); DataFlows(reserve1_flow, data_flow)).
+
+    .decl UniswapV2Swap(amountOut: Variable)
+    UniswapV2Swap(amountOut) :-
+        CallToSignature(call, "swap(uint256,uint256,address,bytes)"),
+        ExternalCall_NumOfArgs(call, 4),
+        (StatementUsesMemory_ActualMemoryArg(_, _, 1, amountOut);
+        StatementUsesMemory_ActualMemoryArg(_, _, 2, amountOut)).
+
+    .decl TransferAmount(amountOut: Variable)
+    TransferAmount(amountOut) :-
+        CallToSignature(call, "transfer(address,uint256)"),
+        ExternalCall_NumOfArgs(call, 2),
+        StatementUsesMemory_ActualMemoryArg(_, _, 2, amountOut).
+
+
+
+    .decl GetFunc(stmt: Statement, var: Variable, func: Function, argindex: number)
+    GetFunc(stmt, var, func, argindex) :-
+        FLA_Statement_Function(stmt, func),
+        FormalArgs(func, var, argindex).
+
+
+    .decl GetCALL(stmt: Statement, var: Variable, num: number, Privatfunc: Variable, value: Function)
+    GetCALL(stmt, var, num-1, Privatfunc, value) :- 
+        Statement_Uses(stmt, var, num),
+        Statement_Uses(stmt, Privatfunc, 0),
+        MyVariable_Value(Privatfunc, value).
+
+
+    .decl FunctionCall(msg_value: Variable)
+    FunctionCall(msg_value) :-
+        CALL(callstmt, _, _, _, _, _, _, _, _),
+        StatementUsesMemory_ActualMemoryArg(callstmt, _, _, msg_value).
+
+
+
+    .decl MsgValue(msg_value: Variable)
+    .output MsgValue
+    MsgValue(msg_value) :-
+        CALLVALUE(_, valuefrom),
+        DataFlows(valuefrom, msg_value),
+        (EQVars(_, msg_value, _);(FunctionCall(msg_value))).
+
+    .decl GasSavingStart(jump_addr: Variable)
+    .output GasSavingStart
+    GasSavingStart(jump_addr) :-
+        CALLDATALOAD(_, _, data_load_from),
+        DataFlows(data_load_from, jump_addr),
+        JUMP(_,jump_addr).
+
+    .decl SwapAndTransfer(amount0: Variable, amount1: Variable)
+    .output SwapAndTransfer
+    SwapAndTransfer(amount0,amount1) :-
+        CALLDATALOAD(_, _, amount_from),
+        DataFlows(amount_from, amount0),
+        UniswapV2Swap(amount0),
+        !UniswapV2GetReserve(amount0),
+        DataFlows(amount_from, amount1),
+        !UniswapV2GetReserve(amount1),
+        TransferAmount(amount1).
