@@ -27,6 +27,9 @@ The `datasets` folder includes the following files:
 
 - **contract_bytecode.pkl**: A dictionary containing the bytecode of potential MEV contracts.
 
+- **frontrunning_arbitrage.pkl**: A dictionary containing 107 MEV contracts and their corresponding successful and failed front-running arbitrages (categorized as mempool and private), along with analysis-required transaction data such as gasPrice, gasUsed, cost, and revenue.
+
+
 ## Scripts
 
 The `scripts` folder includes the following files:
