@@ -8,6 +8,7 @@ The `datasets` folder includes the following files:
 
 - **MEV_transactions.pkl**: A dictionary containing all detected MEV transactions along with their corresponding types, including:
   - **Arbitrage**
+  - **Sandwich Attack**
   - **Multi-Layered-Burger Attack Transaction**
   - **Conjoined Sandwich Attack Transaction**
   - **Toxic Arbitrage**
