@@ -39,5 +39,10 @@ The `scripts` folder includes the following files:
 
 - **Analysis_MEV_Activities_In_Different_Stage.py**: A script that plots the number of MEV activities in different stages.
 
-
 - **Analysis_MEV_Activities_Financial_Metric.py**: A script that plots the financial metrics of MEV activities in different stages.
+
+- **Analysis_MEV_Success_Rate.py**: A script that plots the success rate of mempool front-running arbitrages of MEV contracts.
+
+- **Analysis_MEV_Expected_Profit.py**: A script that plots the distribution of expected profit for front-running arbitrages.
+
+
